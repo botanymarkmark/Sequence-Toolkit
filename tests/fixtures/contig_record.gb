@@ -1,0 +1,8 @@
+LOCUS       NZ_CM000001             5000 bp    DNA     linear   CON 07-JUL-2015
+DEFINITION  Salsola pellucida scaffold1, whole genome shotgun sequence.
+ACCESSION   NZ_CM000001
+VERSION     NZ_CM000001.1
+  ORGANISM  Salsola pellucida
+            Eukaryota; Viridiplantae; Amaranthaceae; Salsola.
+CONTIG      join(AAAB01000001.1:1..2500,AAAB01000002.1:1..2500)
+//

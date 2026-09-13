@@ -1,11 +1,10 @@
-[README.md](https://github.com/user-attachments/files/32100472/README.md)
 # Sequence Toolkit
 
 [**English**](README.md) | [中文](README.zh-CN.md)
 
 A dependency-free Windows GUI for merging, converting, renaming and batch-downloading FASTA and GenBank sequences.
 
-Sequence Toolkit gathers the small, repetitive and easily-mistaken chores of sequence data curation behind one window: combining files whose extensions are inconsistent, converting GenBank to FASTA, normalising sequence names for downstream tools, and retrieving sequences from NCBI by species or genus. It is distributed as a single executable of roughly 10 MB — **no Python installation, no third-party packages and no command line required**.
+Sequence Toolkit gathers the small, repetitive and easily-mistaken chores of sequence data curation behind one window: combining files whose extensions are inconsistent, converting GenBank to FASTA, normalising sequence names for downstream tools, retrieving sequences from NCBI by species or genus, cleaning a species list through the TNRS service, and building a phylogenetic tree from that list. It is distributed as a single executable of roughly 10 MB — **no Python installation, no third-party packages and no command line required**. (Tree generation is the one feature that can use an external program, R — optional, and only if you want that tab.)
 
 ## Features
 
@@ -15,7 +14,9 @@ Sequence Toolkit gathers the small, repetitive and easily-mistaken chores of seq
 | **Rename / Split** | Rewrite `>` header lines with one of three naming rules. Optionally split a multi-record file into individual files, or rename existing files on disk from their contents. |
 | **Search & Batch download** | Query NCBI Nucleotide by species or genus, filter by sequence length, complete-genome status and RefSeq, then download the records you select. Export the resulting accession numbers as `.txt` or `.csv`. |
 | **Download by accession** | Paste accession numbers, load them from a text file, or extract them automatically from FASTA/GenBank files you already have. |
-| **Settings** | NCBI e-mail and API key, HTTP proxy, default output directory, custom file extensions, FASTA line width. |
+| **Name cleaning (TNRS)** | Resolve a list of scientific names through the TNRS service (WCVP + WFO) and get the accepted name, match status and source database for each one. Export the result as CSV, or write the accepted names back into FASTA/GenBank files. |
+| **Phylogenetic tree** | Turn a species list into a Newick tree file with R + V.PhyloMaker2 (TPL / LCVP / WP megatrees, binding scenarios S1–S3) and preview it in the window. R is an **optional** external dependency — see below. |
+| **Settings** | NCBI e-mail and API key, HTTP proxy, default output directory, optional Rscript path, custom file extensions, FASTA line width. |
 
 ## Naming rules
 
@@ -63,6 +64,42 @@ These are the deliberate design decisions that make the tool safe to point at a 
 - **Encoding damage is reported, not hidden.** Non-UTF-8 input raises an explicit encoding warning instead of being silently mangled.
 - **Non-Latin paths work.** Chinese directory and file names are a first-class tested scenario.
 
+## Name cleaning and phylogeny
+
+### Name cleaning (TNRS)
+
+Paste a list of scientific names into the **Name cleaning** tab and press **Start cleaning** (开始清洗) to obtain the accepted name, the match status and the source database of every name. The result can be exported as CSV, and the accepted names can be written back into FASTA / GenBank files.
+
+- Uses the online TNRS service (`https://tnrsapi.xyz/tnrs_api.php`). One request carries at most 5,000 names; longer lists are split into batches automatically. The default nomenclatural sources are WCVP + WFO.
+- **Unmatched names never disappear**: they stay in the table with the status "未匹配" (unmatched) and are summarised **below** the result list (the summary line and the warning note are packed under the result table).
+- The match mode is either `best` (best match only, the default) or `all` (every candidate). With `all` a single name may produce several rows, and the interface states "N 个名称 → M 行结果" (N names → M result rows).
+- Writing names back **never overwrites the input file**: the result goes to the directory you choose with a `_cleaned` suffix added (`样本.fasta` → `样本_cleaned.fasta`).
+- **The 「名录来源」/「匹配模式」 dropdowns last for the current session only**: they are read once while the panel is built and are **not written back** to `settings.json`, so restarting the program returns to the last saved values. To pin a source or a match mode at start-up, edit `%APPDATA%\seq_toolkit\settings.json` (`tnrs_sources` / `tnrs_matches`) directly.
+
+### Phylogenetic tree generation (V.PhyloMaker2)
+
+Paste the scientific names of your species into the **Phylogenetic tree** tab, pick a nomenclature system and a binding scenario, and press **Generate tree** (生成进化树) to obtain a Newick tree file together with an in-window preview. **The names are all you need** — the genus and family are filled in by the program.
+
+- Requires R and the R package V.PhyloMaker2 on your own machine (optional external dependencies, **not bundled** with this program):
+  1. Install R: <https://cran.r-project.org/bin/windows/base/> (the default installation is fine; no administrator rights are needed)
+  2. In R, run `install.packages("remotes")` and then `remotes::install_github("jinyizju/V.PhyloMaker2")`
+  3. Back in this program, enter the path to `Rscript.exe` on the **Settings** tab, or press **Detect R** (检测 R 环境) to find it automatically
+- The nomenclature system is one of **TPL** (The Plant List, 74,529 species, the default), **LCVP** (73,420 species) or **WP** (World Plants, 72,570 species) — the three megatrees bundled with V.PhyloMaker2.
+- The binding scenarios S1/S2/S3 mean "bind to the genus node only / random resolution within the family / random resolution within the genus"; the default is S3.
+- **Species that cannot be bound to the megatree are listed explicitly** (a misspelling, or a name the catalogue does not contain), so they never disappear unnoticed.
+- The first run has to load the megatree: about 17 seconds for 7 species in practice, and more species take longer.
+- **The 「命名系统」/「绑定场景」 dropdowns last for the current session only**: they are read once while the panel is built and are **not written back** to `settings.json`, so restarting the program returns to the last saved values. To pin a system or a scenario at start-up, edit `%APPDATA%\seq_toolkit\settings.json` (`phylo_system` / `phylo_scenario`) directly.
+
+### Known limitations of these two features
+
+- **Tree generation depends on R and V.PhyloMaker2 installed locally.** Both are **optional external dependencies and are not bundled into the executable**; without them the other six tabs work exactly as before. When something is missing the program shows a copy-pasteable three-step installation guide (install R → `install.packages("remotes")` + `remotes::install_github("jinyizju/V.PhyloMaker2")` → enter the `Rscript.exe` path on the Settings tab or press **Detect R**), never an exception stack. The Settings tab additionally offers a **Copy install guide** button, because those lines have to be pasted into R.
+- **The nomenclature systems are the three megatrees bundled with V.PhyloMaker2 — TPL / LCVP / WP** (species counts above) — and **not** APG III or APG IV. The package offers no such option, and the interface deliberately does not pretend otherwise.
+- **The binding scenarios S1 / S2 / S3 decide where an unlisted species is attached to the megatree**: S1 binds to the **genus node** only, S2 uses random resolution **within the family**, S3 uses random resolution **within the genus** (the default). For a species the megatree actually contains all three give the same tree; the difference only shows up for species that need a fallback to genus or family level.
+- **Species that fail to bind are reported explicitly**, together with "input N species / M tips in the tree", instead of silently losing a few species and leaving the user thinking the run succeeded — the "nothing is dropped quietly" rule applied to tree building. R itself prints **two** lines — `[1] "Note: 1 taxa fail to be binded to the tree,"` followed by one line per dropped species (measured on R 4.6.1: `[1] "Xyzzy_foobar"`) — and drops the species; this program catches both lines and reports the list in the window and in the log (as a WARN).
+- **The first run loads a megatree** (more than 70,000 species), which took about 17 seconds for 7 species in practice; hundreds or thousands of species can take minutes. Tree building therefore runs on a background thread, can be cancelled, and times out after 600 seconds.
+- **Name write-back supports uncompressed FASTA / GenBank only**: `.gz` files and non-UTF-8 files (GBK, common on Chinese Windows, for instance) are **rejected explicitly**, with a message telling you to decompress or transcode first. This is a deliberate safety trade-off: reading those files with decoding errors ignored raises nothing and would simply write a corrupted `_cleaned` file that *looks* like a success — making the user take one extra step is much better than emitting a damaged file.
+- **Rows whose status is "partial match" also take part in name write-back**: the specification only excludes "unmatched", so a partial match (score below 1) has its accepted name written into the file as well. Before writing, the interface says how many such rows there are, so that "why was this name replaced by something that is not exactly it?" never comes as a surprise.
+
 ## Quick start
 
 1. Download `Sequence工具箱.exe` from the [Releases](../../releases) page and double-click it.
@@ -96,7 +133,7 @@ The result is `dist/序列工具箱.exe`. Removing the `onefile` options from `b
 python -m pytest -v
 ```
 
-442 automated tests cover the parsers, the naming engine, the orchestration layer, the NCBI client (offline, with injected transports) and the GUI widgets. No test performs real network I/O or real sleeps.
+556 automated tests cover the parsers, the naming engine, the orchestration layer, the NCBI client (offline, with injected transports), the TNRS client, the R runner and the GUI widgets. **555 of them pass**; the single failure is a pre-existing timing case, `tests/test_ncbi.py::test_adjacent_requests_hold_the_interval_with_the_default_clock` (floating-point residue while reconstructing the request timeline), which this project has decided to leave unfixed and which has nothing to do with these features. No test performs real network I/O or real sleeps: TNRS requests go through an injected stand-in and R runs through an injected runner. The real-environment acceptance record (including the runs against R 4.6.1 and V.PhyloMaker2) lives in `docs/acceptance.md`.
 
 ## Known limitations
 
@@ -121,17 +158,19 @@ seq_toolkit/
   naming.py              naming-rule engine (pure functions)
   pipeline.py            merge / convert / split / disk-rename orchestration
   ncbi.py                E-utilities client
+  tnrs.py                name cleaning (TNRS request building, batching, parsing, CSV, write-back)
+  phylo.py               tree generation (Rscript detection, R script rendering, unbound-species parsing, Newick parsing)
   settings.py            configuration persistence
   applog.py              run log and exception list
-  gui/                   Tkinter interface
+  gui/                   Tkinter interface (tab_tnrs.py, tab_phylo.py, tree_canvas.py)
 tests/                   pytest suite
-docs/acceptance.md       end-to-end acceptance record
+docs/acceptance.md       end-to-end acceptance record (28 items plus 12 for features 7 and 8)
 docs/superpowers/        design specification and implementation plan
 ```
 
 ## Contributing
 
-Issues and pull requests are welcome. Please run `python -m pytest` before opening a pull request — every change in this project is expected to keep the suite green.
+Issues and pull requests are welcome. Please run `python -m pytest` before opening a pull request — every change is expected to keep the tests related to it green and the number of passing tests from falling (the one known `test_ncbi` failure noted under **Tests** excepted).
 
 ## License
 
